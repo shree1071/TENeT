@@ -10,7 +10,7 @@ Calculates healthcare necessity scores for regions based on:
 Higher score = greater need for telehealth (0-100 scale)
 """
 import math
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, List
 from sqlalchemy.orm import Session
 from database.models import HealthcareSite, CATRegion, CATDataPoint
 from services.season_constants import (
@@ -124,7 +124,11 @@ class HealthcareDesertCalculator:
         return None
 
     @staticmethod
-    def get_nearest_facility_distances(db: Session, region_code: str) -> Dict[str, Optional[float]]:
+    def get_nearest_facility_distances(
+        db: Session, 
+        region_code: str,
+        precalculated_sites: Optional[List[HealthcareSite]] = None
+    ) -> Dict[str, Optional[float]]:
         """
         Calculate distances from a region center to nearest facility classes.
 
@@ -134,11 +138,14 @@ class HealthcareDesertCalculator:
         if not center:
             return {"clinic": None, "hospital": None, "nearest": None}
 
-        sites = db.query(HealthcareSite).filter(
-            HealthcareSite.is_active == True,
-            HealthcareSite.latitude.isnot(None),
-            HealthcareSite.longitude.isnot(None)
-        ).all()
+        if precalculated_sites is not None:
+            sites = precalculated_sites
+        else:
+            sites = db.query(HealthcareSite).filter(
+                HealthcareSite.is_active == True,
+                HealthcareSite.latitude.isnot(None),
+                HealthcareSite.longitude.isnot(None)
+            ).all()
         if not sites:
             return {"clinic": 999, "hospital": 999, "nearest": 999}
 
@@ -164,13 +171,17 @@ class HealthcareDesertCalculator:
         }
     
     @staticmethod
-    def get_nearest_clinic_distance(db: Session, region_code: str) -> Optional[float]:
+    def get_nearest_clinic_distance(
+        db: Session, 
+        region_code: str,
+        precalculated_sites: Optional[List[HealthcareSite]] = None
+    ) -> Optional[float]:
         """
         Calculate distance from region center to nearest clinic-like site.
         Returns distance in kilometers.
         """
         return HealthcareDesertCalculator.get_nearest_facility_distances(
-            db, region_code
+            db, region_code, precalculated_sites
         )["clinic"]
     
     @staticmethod
@@ -178,7 +189,10 @@ class HealthcareDesertCalculator:
         db: Session, 
         region_code: str,
         season: str = SEASON_YEAR_ROUND,
-        road_quality: str = ROAD_QUALITY_LOCAL
+        road_quality: str = ROAD_QUALITY_LOCAL,
+        precalculated_sites: Optional[List[HealthcareSite]] = None,
+        precalculated_density: Optional[int] = None,
+        precalculated_specialist: Optional[bool] = None
     ) -> Dict:
         """
         Calculate compound healthcare desert metric (0-100).
@@ -199,7 +213,7 @@ class HealthcareDesertCalculator:
         
         # 1. Distance factor (0-100) incorporates both clinic and hospital
         facility_distances = HealthcareDesertCalculator.get_nearest_facility_distances(
-            db, region_code
+            db, region_code, precalculated_sites
         )
         if facility_distances["nearest"] is None:
             clinic_dist = 500.0
@@ -219,18 +233,23 @@ class HealthcareDesertCalculator:
         distance_score = (0.6 * hospital_score) + (0.4 * clinic_score)
         
         # 2. Health site density (0-100)
-        num_sites = db.query(HealthcareSite).filter(
-            HealthcareSite.region_code == region_code
-        ).count()
+        if precalculated_density is not None:
+            num_sites = precalculated_density
+        else:
+            num_sites = db.query(HealthcareSite).filter(
+                HealthcareSite.region_code == region_code
+            ).count()
         
         density_score = HealthcareDesertCalculator.score_density_component(num_sites)
         
         # 3. Specialist availability (0-100)
-        has_specialists = db.query(HealthcareSite).filter(
-            HealthcareSite.region_code == region_code,
-            HealthcareSite.has_specialists == True
-        ).count() > 0
-        
+        if precalculated_specialist is not None:
+            has_specialists = precalculated_specialist
+        else:
+            has_specialists = db.query(HealthcareSite).filter(
+                HealthcareSite.region_code == region_code,
+                HealthcareSite.has_specialists == True
+            ).first() is not None       
         specialist_score = HealthcareDesertCalculator.score_specialist_component(has_specialists)
         
         # Validate season and road_quality inputs
@@ -297,12 +316,39 @@ class HealthcareDesertCalculator:
             season: 'summer', 'winter', or 'year_round'
             road_quality: 'highway', 'local', or 'seasonal'
         """
+        # Pre-fetch all active sites to prevent N+1 query loop
+        all_sites = db.query(HealthcareSite).filter(
+            HealthcareSite.is_active == True,
+            HealthcareSite.latitude.isnot(None),
+            HealthcareSite.longitude.isnot(None)
+        ).all()
+        
+        # Build memory caches for density and specialist counts
+        region_stats = {}
+        for site in all_sites:
+            rc = site.region_code
+            if not rc:
+                continue
+            if rc not in region_stats:
+                region_stats[rc] = {"count": 0, "has_specialist": False}
+            
+            region_stats[rc]["count"] += 1
+            if site.has_specialists:
+                region_stats[rc]["has_specialist"] = True
+
         regions = db.query(CATRegion).all()
         
         results = []
         for region in regions:
+            rc = region.region_code
+            density = region_stats.get(rc, {}).get("count", 0)
+            specialist = region_stats.get(rc, {}).get("has_specialist", False)
+            
             score_data = HealthcareDesertCalculator.calculate_healthcare_necessity_score(
-                db, region.region_code, season, road_quality
+                db, rc, season, road_quality,
+                precalculated_sites=all_sites,
+                precalculated_density=density,
+                precalculated_specialist=specialist
             )
             results.append({
                 'region_code': region.region_code,
