@@ -231,3 +231,72 @@ class CATDataImporter:
             
         except Exception as e:
             raise Exception(f"Error exporting to GeoJSON: {str(e)}")
+
+    @staticmethod
+    def calculate_static_healthcare_metrics(db: Session) -> Tuple[int, str]:
+        """
+        Pre-compute geographic distances from regions to nearest healthcare sites
+        and save them statically in the database to prevent O(N^2) web queries.
+        """
+        from database.models import HealthcareSite, CATDataPoint
+        from services.healthcare_desert_calculator import HealthcareDesertCalculator
+        
+        try:
+            regions = db.query(CATRegion).all()
+            sites = db.query(HealthcareSite).filter(
+                HealthcareSite.is_active == True,
+                HealthcareSite.latitude.isnot(None),
+                HealthcareSite.longitude.isnot(None)
+            ).all()
+            
+            if not sites:
+                return 0, "No active healthcare sites found for calculation"
+                
+            count = 0
+            for region in regions:
+                center_lat = region.centroid_lat
+                center_lon = region.centroid_lon
+                
+                # If no centroid, fallback to first data point
+                if center_lat is None or center_lon is None:
+                    dp = db.query(CATDataPoint).filter(CATDataPoint.region_code == region.region_code).first()
+                    if dp:
+                        center_lat, center_lon = dp.latitude, dp.longitude
+                
+                if center_lat is None or center_lon is None:
+                    continue
+                    
+                clinic_dist = float('inf')
+                hospital_dist = float('inf')
+                density = 0
+                has_specialist = False
+                
+                clinic_types = {"clinic", "health_center", "community_health_center"}
+                
+                for site in sites:
+                    if site.region_code == region.region_code:
+                        density += 1
+                        if getattr(site, 'has_specialists', False):
+                            has_specialist = True
+                            
+                    dist = HealthcareDesertCalculator.calculate_distance(
+                        center_lat, center_lon, site.latitude, site.longitude
+                    )
+                    if site.facility_type in clinic_types and dist < clinic_dist:
+                        clinic_dist = dist
+                    elif site.facility_type == "hospital" and dist < hospital_dist:
+                        hospital_dist = dist
+                
+                region.nearest_clinic_km = clinic_dist if clinic_dist != float('inf') else 999.0
+                region.nearest_hospital_km = hospital_dist if hospital_dist != float('inf') else 999.0
+                region.healthcare_density = density
+                region.has_specialist = has_specialist
+                
+                count += 1
+                
+            db.commit()
+            return count, f"Successfully calculated static metrics for {count} regions"
+            
+        except Exception as e:
+            db.rollback()
+            return 0, f"Error calculating static metrics: {str(e)}"

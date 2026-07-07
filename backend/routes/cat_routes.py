@@ -1313,14 +1313,15 @@ def get_all_healthcare_necessity():
         if road_quality not in VALID_ROAD_QUALITIES:
             road_quality = ROAD_QUALITY_LOCAL
         
-        results = HealthcareDesertCalculator.get_all_region_scores(db, season, road_quality)
+        page = int(request.args.get('page', 1))
+        limit = int(request.args.get('limit', 50))
         
-        return jsonify({
-            'regions': results,
-            'count': len(results),
-            'season_applied': season,
-            'season_display': get_season_display_name(season)
-        }), 200
+        results = HealthcareDesertCalculator.get_all_region_scores(db, season, road_quality, page, limit)
+        
+        results['season_applied'] = season
+        results['season_display'] = get_season_display_name(season)
+        
+        return jsonify(results), 200
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500

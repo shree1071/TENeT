@@ -31,6 +31,12 @@ class CATRegion(Base):
     centroid_lat = Column(Float, nullable=True)
     centroid_lon = Column(Float, nullable=True)
     
+    # Pre-computed static healthcare metrics (ETL output)
+    nearest_clinic_km = Column(Float, nullable=True)
+    nearest_hospital_km = Column(Float, nullable=True)
+    healthcare_density = Column(Integer, default=0)
+    has_specialist = Column(Boolean, default=False)
+    
     # Additional properties stored as JSON
     properties = Column(JSON, nullable=True)
     

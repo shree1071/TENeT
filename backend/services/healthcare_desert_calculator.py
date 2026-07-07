@@ -10,7 +10,7 @@ Calculates healthcare necessity scores for regions based on:
 Higher score = greater need for telehealth (0-100 scale)
 """
 import math
-from typing import Dict, Optional, Tuple, List
+from typing import Dict, Optional, Tuple, List, Union
 from sqlalchemy.orm import Session
 from database.models import HealthcareSite, CATRegion, CATDataPoint
 from services.season_constants import (
@@ -122,107 +122,28 @@ class HealthcareDesertCalculator:
             return region.centroid_lat, region.centroid_lon
 
         return None
-
-    @staticmethod
-    def get_nearest_facility_distances(
-        db: Session, 
-        region_code: str,
-        precalculated_sites: Optional[List[HealthcareSite]] = None
-    ) -> Dict[str, Optional[float]]:
-        """
-        Calculate distances from a region center to nearest facility classes.
-
-        Returns clinic, hospital, and nearest-facility distances in kilometers.
-        """
-        center = HealthcareDesertCalculator._region_center(db, region_code)
-        if not center:
-            return {"clinic": None, "hospital": None, "nearest": None}
-
-        if precalculated_sites is not None:
-            sites = precalculated_sites
-        else:
-            sites = db.query(HealthcareSite).filter(
-                HealthcareSite.is_active == True,
-                HealthcareSite.latitude.isnot(None),
-                HealthcareSite.longitude.isnot(None)
-            ).all()
-        if not sites:
-            return {"clinic": 999, "hospital": 999, "nearest": 999}
-
-        avg_lat, avg_lon = center
-        distances = {"clinic": float("inf"), "hospital": float("inf"), "nearest": float("inf")}
-        clinic_types = {"clinic", "health_center", "community_health_center"}
-
-        for site in sites:
-            distance = HealthcareDesertCalculator.calculate_distance(
-                avg_lat, avg_lon, site.latitude, site.longitude
-            )
-            distances["nearest"] = min(distances["nearest"], distance)
-
-            site_type = (site.site_type or "").lower()
-            if site_type in clinic_types:
-                distances["clinic"] = min(distances["clinic"], distance)
-            if site_type == "hospital":
-                distances["hospital"] = min(distances["hospital"], distance)
-
-        return {
-            key: (999 if value == float("inf") else value)
-            for key, value in distances.items()
-        }
-    
-    @staticmethod
-    def get_nearest_clinic_distance(
-        db: Session, 
-        region_code: str,
-        precalculated_sites: Optional[List[HealthcareSite]] = None
-    ) -> Optional[float]:
-        """
-        Calculate distance from region center to nearest clinic-like site.
-        Returns distance in kilometers.
-        """
-        return HealthcareDesertCalculator.get_nearest_facility_distances(
-            db, region_code, precalculated_sites
-        )["clinic"]
     
     @staticmethod
     def calculate_healthcare_necessity_score(
         db: Session, 
-        region_code: str,
+        region_or_code: Union[str, CATRegion],
         season: str = SEASON_YEAR_ROUND,
-        road_quality: str = ROAD_QUALITY_LOCAL,
-        precalculated_sites: Optional[List[HealthcareSite]] = None,
-        precalculated_density: Optional[int] = None,
-        precalculated_specialist: Optional[bool] = None
+        road_quality: str = ROAD_QUALITY_LOCAL
     ) -> Dict:
         """
         Calculate compound healthcare desert metric (0-100).
         Higher score = greater need for telehealth.
-        
-        Args:
-            db: Database session
-            region_code: The CAT region code to evaluate
-            season: 'summer', 'winter', or 'year_round' (user-selected)
-            road_quality: 'highway', 'local', or 'seasonal'
-        
-        Factors:
-        1. Distance to nearest clinic/hospital (50% weight)
-        2. Number of health sites in region (15% weight)
-        3. Specialist availability (15% weight)
-        4. Transportation difficulty - season-adjusted (20% weight)
         """
-        
-        # 1. Distance factor (0-100) incorporates both clinic and hospital
-        facility_distances = HealthcareDesertCalculator.get_nearest_facility_distances(
-            db, region_code, precalculated_sites
-        )
-        if facility_distances["nearest"] is None:
-            clinic_dist = 500.0
-            hospital_dist = 500.0
-            nearest_dist = 500.0
+        if isinstance(region_or_code, str):
+            region = db.query(CATRegion).filter(CATRegion.region_code == region_or_code).first()
+            if not region:
+                region = CATRegion(region_code=region_or_code)
         else:
-            clinic_dist = facility_distances['clinic']
-            hospital_dist = facility_distances['hospital']
-            nearest_dist = facility_distances['nearest']
+            region = region_or_code
+            
+        # 1. Distance factor (0-100) incorporates both clinic and hospital
+        clinic_dist = region.nearest_clinic_km if region.nearest_clinic_km is not None else 500.0
+        hospital_dist = region.nearest_hospital_km if region.nearest_hospital_km is not None else 500.0
             
         # Normalize: 0km=0 points, 300+km=100 points for clinic
         clinic_score = HealthcareDesertCalculator.score_distance_component(clinic_dist)
@@ -233,23 +154,11 @@ class HealthcareDesertCalculator:
         distance_score = (0.6 * hospital_score) + (0.4 * clinic_score)
         
         # 2. Health site density (0-100)
-        if precalculated_density is not None:
-            num_sites = precalculated_density
-        else:
-            num_sites = db.query(HealthcareSite).filter(
-                HealthcareSite.region_code == region_code
-            ).count()
-        
+        num_sites = region.healthcare_density if region.healthcare_density is not None else 0
         density_score = HealthcareDesertCalculator.score_density_component(num_sites)
         
         # 3. Specialist availability (0-100)
-        if precalculated_specialist is not None:
-            has_specialists = precalculated_specialist
-        else:
-            has_specialists = db.query(HealthcareSite).filter(
-                HealthcareSite.region_code == region_code,
-                HealthcareSite.has_specialists == True
-            ).first() is not None       
+        has_specialists = region.has_specialist if region.has_specialist is not None else False
         specialist_score = HealthcareDesertCalculator.score_specialist_component(has_specialists)
         
         # Validate season and road_quality inputs
@@ -259,9 +168,8 @@ class HealthcareDesertCalculator:
             road_quality = ROAD_QUALITY_LOCAL
         
         # 4. Transportation difficulty (0-100) - SEASON ADJUSTED
-        # Use travel_time from CAT data points with seasonal modifiers
         data_point = db.query(CATDataPoint).filter(
-            CATDataPoint.region_code == region_code
+            CATDataPoint.region_code == region.region_code
         ).first()
         
         transport_score = HealthcareDesertCalculator.score_transport_component(
@@ -279,6 +187,8 @@ class HealthcareDesertCalculator:
             0.20 * transport_score
         )
         
+        nearest_dist = min(clinic_dist, hospital_dist)
+        
         return {
             'necessity_score': round(necessity_score, 2),
             'distance_to_nearest_clinic_km': round(float(clinic_dist), 2),
@@ -295,10 +205,10 @@ class HealthcareDesertCalculator:
                              'Actual conditions may vary.'
             },
             'breakdown': {
-                'distance_component': round(float(distance_score), 2),  # type: ignore
-                'density_component': round(float(density_score), 2),  # type: ignore
-                'specialist_component': round(float(specialist_score), 2),  # type: ignore
-                'transport_component': round(float(transport_score), 2),  # type: ignore
+                'distance_component': round(float(distance_score), 2),
+                'density_component': round(float(density_score), 2),
+                'specialist_component': round(float(specialist_score), 2),
+                'transport_component': round(float(transport_score), 2),
                 'transport_season_adjusted': True
             }
         }
@@ -307,64 +217,70 @@ class HealthcareDesertCalculator:
     def get_all_region_scores(
         db: Session,
         season: str = SEASON_YEAR_ROUND,
-        road_quality: str = ROAD_QUALITY_LOCAL
-    ) -> list:
+        road_quality: str = ROAD_QUALITY_LOCAL,
+        page: int = 1,
+        limit: int = 50
+    ) -> Dict:
         """
-        Get necessity scores for all regions, sorted by score (highest first).
-        
-        Args:
-            season: 'summer', 'winter', or 'year_round'
-            road_quality: 'highway', 'local', or 'seasonal'
+        Get necessity scores for all regions, paginated and sorted by score.
         """
-        # Pre-fetch all active sites to prevent N+1 query loop
-        all_sites = db.query(HealthcareSite).filter(
-            HealthcareSite.is_active == True,
-            HealthcareSite.latitude.isnot(None),
-            HealthcareSite.longitude.isnot(None)
-        ).all()
+        query = db.query(CATRegion)
+        total = query.count()
         
-        # Build memory caches for density and specialist counts
-        region_stats = {}
-        for site in all_sites:
-            rc = site.region_code
-            if not rc:
-                continue
-            if rc not in region_stats:
-                region_stats[rc] = {"count": 0, "has_specialist": False}
-            
-            region_stats[rc]["count"] += 1
-            if site.has_specialists:
-                region_stats[rc]["has_specialist"] = True
-
-        regions = db.query(CATRegion).all()
+        regions = query.offset((page - 1) * limit).limit(limit).all()
         
         results = []
         for region in regions:
-            rc = region.region_code
-            density = region_stats.get(rc, {}).get("count", 0)
-            specialist = region_stats.get(rc, {}).get("has_specialist", False)
-            
             score_data = HealthcareDesertCalculator.calculate_healthcare_necessity_score(
-                db, rc, season, road_quality,
-                precalculated_sites=all_sites,
-                precalculated_density=density,
-                precalculated_specialist=specialist
+                db, region, season, road_quality
             )
             results.append({
                 'region_code': region.region_code,
                 'region_name': region.region_name,
+                'tier_level': region.tier_level,
                 'cat_tier': region.tier_level,
                 'necessity_score': score_data['necessity_score'],
                 'num_healthcare_sites': score_data['num_healthcare_sites'],
                 'has_specialist_access': score_data['has_specialist_access'],
-                'season_applied': season
+                'season_applied': season,
+                'components': score_data['breakdown'],
+                'is_telehealth_priority': score_data['necessity_score'] > 75.0,
+                'risk_level': 'critical' if score_data['necessity_score'] > 85.0 else 'high' if score_data['necessity_score'] > 70.0 else 'moderate'
             })
-        
-        # Sort by necessity score (highest first = most in need)
+            
+        # Sort by necessity score (highest first)
         results.sort(key=lambda x: x['necessity_score'], reverse=True)
         
-        return results
+        return {
+            "data": results,
+            "meta": {
+                "page": page,
+                "limit": limit,
+                "total": total,
+                "total_pages": math.ceil(total / limit) if limit > 0 else 1
+            }
+        }
 
+
+    @staticmethod
+    def calculate_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+        """
+        Calculate the great circle distance between two points 
+        on the earth (specified in decimal degrees)
+        """
+        if None in (lat1, lon1, lat2, lon2):
+            return float('inf')
+            
+        # Convert decimal degrees to radians 
+        lon1, lat1, lon2, lat2 = map(math.radians, [lon1, lat1, lon2, lat2])
+
+        # Haversine formula 
+        dlon = lon2 - lon1 
+        dlat = lat2 - lat1 
+        a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
+        c = 2 * math.asin(math.sqrt(a)) 
+        r = 6371 # Radius of earth in kilometers
+        return c * r
 
 # Module-level convenience wrapper so callers don't need to import the class.
 def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:

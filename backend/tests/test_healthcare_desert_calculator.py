@@ -5,24 +5,28 @@ from services.healthcare_desert_calculator import HealthcareDesertCalculator
 from services.season_constants import SEASON_SUMMER, SEASON_WINTER, SEASON_YEAR_ROUND
 
 
-def add_region(db, code="AK-TEST", lat=61.0, lon=-149.0, travel_time=120):
+def add_region(db_session, code="AK-TEST", lat=61.0, lon=-149.0, travel_time=30, nearest_clinic_km=0.0, nearest_hospital_km=0.0, has_specialist=False, healthcare_density=0):
     upload = CATUpload(filename="test.csv", file_type="csv", status="completed")
-    db.add(upload)
-    db.flush()
+    db_session.add(upload)
+    db_session.flush()
 
     region = CATRegion(
         region_code=code,
         region_name="Test Region",
-        tier_level=2,
+        tier_level=3,
         centroid_lat=lat,
         centroid_lon=lon,
         access_score=60,
+        nearest_clinic_km=nearest_clinic_km,
+        nearest_hospital_km=nearest_hospital_km,
+        has_specialist=has_specialist,
+        healthcare_density=healthcare_density,
         properties={"primary_access_modes": "road,air"},
     )
-    db.add(region)
-    db.flush()
+    db_session.add(region)
+    db_session.flush()
 
-    db.add(CATDataPoint(
+    db_session.add(CATDataPoint(
         upload_id=upload.id,
         region_id=region.id,
         region_code=code,
@@ -33,7 +37,7 @@ def add_region(db, code="AK-TEST", lat=61.0, lon=-149.0, travel_time=120):
         access_quality=60,
         travel_time_minutes=travel_time,
     ))
-    db.commit()
+    db_session.commit()
     return region
 
 
@@ -53,13 +57,7 @@ def add_site(db, code="AK-TEST", name="Clinic", site_type="clinic", lat=61.0, lo
     return site
 
 
-def test_distance_to_nearest_facility_zero_when_facility_matches_region_center(db_session):
-    add_region(db_session)
-    add_site(db_session, name="Clinic at Center", site_type="clinic")
 
-    distances = HealthcareDesertCalculator.get_nearest_facility_distances(db_session, "AK-TEST")
-
-    assert distances["clinic"] == 0
 
 
 @pytest.mark.parametrize(
@@ -123,7 +121,7 @@ def test_transport_component_formula_for_access_modes(mode, season, road_quality
 
 
 def test_composite_score_matches_hand_calculated_example(db_session):
-    add_region(db_session, travel_time=120)
+    add_region(db_session, travel_time=120, nearest_clinic_km=0.0, nearest_hospital_km=0.0, has_specialist=True, healthcare_density=2)
     add_site(db_session, name="Clinic", site_type="clinic")
     add_site(db_session, name="Hospital", site_type="hospital", specialists=True)
 
@@ -165,9 +163,14 @@ def test_winter_transport_adjustment_increases_score_against_summer(db_session):
 
 
 def test_specialist_availability_lowers_need_score(db_session):
-    add_region(db_session, travel_time=60)
+    add_region(db_session, travel_time=60, nearest_clinic_km=0.0, nearest_hospital_km=0.0, has_specialist=False)
     add_site(db_session, site_type="clinic")
     no_specialist = HealthcareDesertCalculator.calculate_healthcare_necessity_score(db_session, "AK-TEST")
+
+    # Manually update the region to simulate the ETL process seeing the new hospital
+    region = db_session.query(CATRegion).filter_by(region_code="AK-TEST").first()
+    region.has_specialist = True
+    db_session.commit()
 
     add_site(db_session, name="Specialist Hospital", site_type="hospital", specialists=True)
     with_specialist = HealthcareDesertCalculator.calculate_healthcare_necessity_score(db_session, "AK-TEST")
