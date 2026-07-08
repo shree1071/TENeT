@@ -180,6 +180,32 @@ def test_specialist_availability_lowers_need_score(db_session):
     assert with_specialist["necessity_score"] < no_specialist["necessity_score"]
 
 
+def test_get_all_region_scores_global_pagination(db_session):
+    # Add 3 regions with vastly different hospital distances to guarantee different scores
+    add_region(db_session, code="REGION-LOW", travel_time=10, nearest_hospital_km=10.0)
+    add_region(db_session, code="REGION-MID", travel_time=60, nearest_hospital_km=100.0)
+    add_region(db_session, code="REGION-HIGH", travel_time=120, nearest_hospital_km=500.0)
+
+    # Request page 1 with limit 2
+    page1 = HealthcareDesertCalculator.get_all_region_scores(db_session, page=1, limit=2)
+    
+    assert len(page1["data"]) == 2
+    assert page1["meta"]["total"] == 3
+    assert page1["meta"]["page"] == 1
+    
+    # The highest score should be first (REGION-HIGH)
+    assert page1["data"][0]["region_code"] == "REGION-HIGH"
+    # The second highest score should be next (REGION-MID)
+    assert page1["data"][1]["region_code"] == "REGION-MID"
+    
+    # Request page 2 with limit 2
+    page2 = HealthcareDesertCalculator.get_all_region_scores(db_session, page=2, limit=2)
+    
+    assert len(page2["data"]) == 1
+    # The lowest score should be the only one on page 2
+    assert page2["data"][0]["region_code"] == "REGION-LOW"
+
+
 def test_missing_region_data_is_handled_safely(db_session):
     score = HealthcareDesertCalculator.calculate_healthcare_necessity_score(
         db_session,
