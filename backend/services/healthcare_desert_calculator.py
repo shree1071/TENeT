@@ -227,7 +227,7 @@ class HealthcareDesertCalculator:
         query = db.query(CATRegion)
         total = query.count()
         
-        regions = query.offset((page - 1) * limit).limit(limit).all()
+        regions = query.all()
         
         results = []
         for region in regions:
@@ -248,11 +248,16 @@ class HealthcareDesertCalculator:
                 'risk_level': 'critical' if score_data['necessity_score'] > 85.0 else 'high' if score_data['necessity_score'] > 70.0 else 'moderate'
             })
             
-        # Sort by necessity score (highest first)
+        # Sort by necessity score (highest first = most in need) globally
         results.sort(key=lambda x: x['necessity_score'], reverse=True)
         
+        # Paginate the sorted results
+        start_idx = (page - 1) * limit
+        end_idx = start_idx + limit
+        paginated_results = results[start_idx:end_idx] if limit > 0 else results
+        
         return {
-            "data": results,
+            "data": paginated_results,
             "meta": {
                 "page": page,
                 "limit": limit,
