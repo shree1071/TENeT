@@ -499,6 +499,10 @@ def get_regions():
         else:
             regions = db.query(CATRegion).all()
 
+        # Pre-fetch all data points to prevent N+1 queries
+        all_data_points = db.query(CATDataPoint).all()
+        data_point_map = {dp.region_code: dp for dp in all_data_points}
+
         result = []
         for region in regions:
             base_tier = region.tier_level
@@ -510,8 +514,9 @@ def get_regions():
             )
             
             # Calculate healthcare necessity score
+            data_point = data_point_map.get(region.region_code)
             necessity_data = HealthcareDesertCalculator.calculate_healthcare_necessity_score(
-                db, region.region_code, season
+                db, region, season, precalculated_data_point=data_point
             )
             necessity_score = necessity_data['necessity_score'] if necessity_data else 0
             

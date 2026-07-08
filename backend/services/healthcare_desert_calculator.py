@@ -128,7 +128,8 @@ class HealthcareDesertCalculator:
         db: Session, 
         region_or_code: Union[str, CATRegion],
         season: str = SEASON_YEAR_ROUND,
-        road_quality: str = ROAD_QUALITY_LOCAL
+        road_quality: str = ROAD_QUALITY_LOCAL,
+        precalculated_data_point = None
     ) -> Dict:
         """
         Calculate compound healthcare desert metric (0-100).
@@ -168,9 +169,12 @@ class HealthcareDesertCalculator:
             road_quality = ROAD_QUALITY_LOCAL
         
         # 4. Transportation difficulty (0-100) - SEASON ADJUSTED
-        data_point = db.query(CATDataPoint).filter(
-            CATDataPoint.region_code == region.region_code
-        ).first()
+        if precalculated_data_point is not None:
+            data_point = precalculated_data_point
+        else:
+            data_point = db.query(CATDataPoint).filter(
+                CATDataPoint.region_code == region.region_code
+            ).first()
         
         transport_score = HealthcareDesertCalculator.score_transport_component(
             data_point.travel_time_minutes if data_point else None,
