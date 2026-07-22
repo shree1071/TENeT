@@ -1,0 +1,498 @@
+# Instincts generated from https://github.com/shree1071/TENeT
+# Generated: 2026-07-22T10:29:17.631Z
+# Version: 2.0
+# NOTE: This file supplements (does not replace) any existing curated instincts.
+# High-confidence manually curated instincts should be preserved alongside these.
+
+---
+id: TENeT-commit-conventional
+trigger: "when writing a commit message"
+confidence: 0.85
+domain: git
+source: repo-analysis
+source_repo: https://github.com/shree1071/TENeT
+---
+
+# TENeT Commit Conventional
+
+## Action
+
+Use conventional commit format with prefixes: feat, chore, fix
+
+## Evidence
+
+- 8 commits analyzed
+- Detected conventional commit pattern
+- Examples: feat(map): Canvas foundation overlay for high-performance markers, fix(canvas): precompute projected mercator coordinates and color for affine transform
+
+---
+id: TENeT-commit-length
+trigger: "when writing a commit message"
+confidence: 0.6
+domain: git
+source: repo-analysis
+source_repo: https://github.com/shree1071/TENeT
+---
+
+# TENeT Commit Length
+
+## Action
+
+Write moderate-length commit messages (~74 characters)
+
+## Evidence
+
+- Average commit message length: 74 chars
+- Based on 8 commits
+
+---
+id: TENeT-naming-files
+trigger: "when creating a new file"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/shree1071/TENeT
+---
+
+# TENeT Naming Files
+
+## Action
+
+Use PascalCase naming convention
+
+## Evidence
+
+- Analyzed file naming patterns in repository
+- Dominant pattern: PascalCase
+
+---
+id: TENeT-import-relative
+trigger: "when importing modules"
+confidence: 0.75
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/shree1071/TENeT
+---
+
+# TENeT Import Relative
+
+## Action
+
+Use relative imports for project files
+
+## Evidence
+
+- Import analysis shows relative import pattern
+- Example: import { x } from '../lib/x'
+
+---
+id: TENeT-export-style
+trigger: "when exporting from a module"
+confidence: 0.7
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/shree1071/TENeT
+---
+
+# TENeT Export Style
+
+## Action
+
+Prefer default exports
+
+## Evidence
+
+- Export pattern analysis
+- Dominant style: default
+
+---
+id: TENeT-arch-type-based
+trigger: "when adding new code"
+confidence: 0.8
+domain: architecture
+source: repo-analysis
+source_repo: https://github.com/shree1071/TENeT
+---
+
+# TENeT Arch Type Based
+
+## Action
+
+Place code in the appropriate type folder (components/, services/, utils/, etc.)
+
+## Evidence
+
+- Type-based module organization detected
+- Folders: 
+
+---
+id: TENeT-workflow-canvas-feature-development
+trigger: "when doing canvas feature development"
+confidence: 0.65
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/shree1071/TENeT
+---
+
+# TENeT Workflow Canvas Feature Development
+
+## Action
+
+Follow the canvas-feature-development workflow:
+1. Edit or create frontend/src/components/map/CanvasLayer.tsx
+2. Edit or create related hook in frontend/src/hooks/ (e.g., useCanvasData.ts or useCanvasOverlay.tsx)
+3. Update frontend/src/App.tsx if integration or wiring is needed
+4. Optionally update or add tests in frontend/src/hooks/ or frontend/src/components/map/
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~3x per month
+- Files: frontend/src/components/map/CanvasLayer.tsx, frontend/src/hooks/useCanvasData.ts, frontend/src/hooks/useCanvasOverlay.tsx
+
+---
+id: TENeT-workflow-canvas-refactor-or-bugfix
+trigger: "when doing canvas refactor or bugfix"
+confidence: 0.6
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/shree1071/TENeT
+---
+
+# TENeT Workflow Canvas Refactor Or Bugfix
+
+## Action
+
+Follow the canvas-refactor-or-bugfix workflow:
+1. Edit frontend/src/components/map/CanvasLayer.tsx
+2. Edit corresponding hook in frontend/src/hooks/ (e.g., useCanvasData.ts)
+3. Optionally update or add related tests
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~2x per month
+- Files: frontend/src/components/map/CanvasLayer.tsx, frontend/src/hooks/useCanvasData.ts
+
+---
+id: TENeT-workflow-canvas-test-and-cleanup
+trigger: "when doing canvas test and cleanup"
+confidence: 0.6
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/shree1071/TENeT
+---
+
+# TENeT Workflow Canvas Test And Cleanup
+
+## Action
+
+Follow the canvas-test-and-cleanup workflow:
+1. Edit or add test files in frontend/src/hooks/ or frontend/src/components/
+2. Remove dead or orphaned files if necessary
+3. Strip trailing whitespace from canvas-related files
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~2x per month
+- Files: frontend/src/hooks/useCanvasOverlay.test.tsx, frontend/src/components/PerformanceCanvasLayer.test.tsx, frontend/src/components/map/CanvasLayer.tsx
+
+---
+id: tenet-instinct-file-naming
+trigger: "When creating or renaming a file in the codebase"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: shree1071/TENeT
+---
+
+# Tenet Instinct File Naming
+
+## Action
+
+Use PascalCase for file names
+
+## Evidence
+
+- Naming convention specified in analysis
+- Pattern in frontend/src/components/map/CanvasLayer.tsx
+
+---
+id: tenet-instinct-function-naming
+trigger: "When defining a function"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: shree1071/TENeT
+---
+
+# Tenet Instinct Function Naming
+
+## Action
+
+Use camelCase for function names
+
+## Evidence
+
+- Naming convention specified in analysis
+- Pattern in frontend/src/hooks/useCanvasData.ts
+
+---
+id: tenet-instinct-class-naming
+trigger: "When defining a class"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: shree1071/TENeT
+---
+
+# Tenet Instinct Class Naming
+
+## Action
+
+Use PascalCase for class names
+
+## Evidence
+
+- Naming convention specified in analysis
+- Pattern in frontend/src/components/map/CanvasLayer.tsx
+
+---
+id: tenet-instinct-constant-naming
+trigger: "When defining a constant"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: shree1071/TENeT
+---
+
+# Tenet Instinct Constant Naming
+
+## Action
+
+Use SCREAMING_SNAKE_CASE for constant names
+
+## Evidence
+
+- Naming convention specified in analysis
+
+---
+id: tenet-instinct-import-style
+trigger: "When importing modules"
+confidence: 0.85
+domain: code-style
+source: repo-analysis
+source_repo: shree1071/TENeT
+---
+
+# Tenet Instinct Import Style
+
+## Action
+
+Use relative import paths
+
+## Evidence
+
+- Import style specified in analysis
+- Pattern in frontend/src/hooks/useCanvasData.ts
+
+---
+id: tenet-instinct-export-style
+trigger: "When exporting modules"
+confidence: 0.85
+domain: code-style
+source: repo-analysis
+source_repo: shree1071/TENeT
+---
+
+# Tenet Instinct Export Style
+
+## Action
+
+Use default exports
+
+## Evidence
+
+- Export style specified in analysis
+- Pattern in frontend/src/components/map/CanvasLayer.tsx
+
+---
+id: tenet-instinct-test-location
+trigger: "When adding or updating tests"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: shree1071/TENeT
+---
+
+# Tenet Instinct Test Location
+
+## Action
+
+Place test files alongside the code in frontend/src/hooks/ or frontend/src/components/
+
+## Evidence
+
+- Pattern in frontend/src/hooks/useCanvasOverlay.test.tsx
+- Pattern in frontend/src/components/PerformanceCanvasLayer.test.tsx
+
+---
+id: tenet-instinct-test-naming
+trigger: "When naming test files"
+confidence: 0.9
+domain: testing
+source: repo-analysis
+source_repo: shree1071/TENeT
+---
+
+# Tenet Instinct Test Naming
+
+## Action
+
+Name test files with .test.tsx suffix
+
+## Evidence
+
+- Pattern in frontend/src/hooks/useCanvasOverlay.test.tsx
+- Pattern in frontend/src/components/PerformanceCanvasLayer.test.tsx
+
+---
+id: tenet-instinct-test-coverage
+trigger: "When adding new features or refactoring canvas-related code"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: shree1071/TENeT
+---
+
+# Tenet Instinct Test Coverage
+
+## Action
+
+Add or update tests for affected components or hooks
+
+## Evidence
+
+- Workflow steps in canvas-feature-development and canvas-refactor-or-bugfix
+- Pattern in commit examples
+
+---
+id: tenet-instinct-git-commit-format
+trigger: "When writing a commit message"
+confidence: 0.9
+domain: git
+source: repo-analysis
+source_repo: shree1071/TENeT
+---
+
+# Tenet Instinct Git Commit Format
+
+## Action
+
+Use conventional commit format: <type>(<scope>): <description>
+
+## Evidence
+
+- Pattern in commit examples: 'feat(map): ...', 'fix(canvas): ...'
+- Conventional commit prefixes: feat, fix, chore
+
+---
+id: tenet-instinct-git-commit-length
+trigger: "When writing a commit message"
+confidence: 0.8
+domain: git
+source: repo-analysis
+source_repo: shree1071/TENeT
+---
+
+# Tenet Instinct Git Commit Length
+
+## Action
+
+Keep commit messages concise (around 74 characters)
+
+## Evidence
+
+- Average commit length: 74
+- Pattern in commit examples
+
+---
+id: tenet-instinct-git-chore-cleanup
+trigger: "When removing dead files or whitespace"
+confidence: 0.85
+domain: git
+source: repo-analysis
+source_repo: shree1071/TENeT
+---
+
+# Tenet Instinct Git Chore Cleanup
+
+## Action
+
+Use 'chore' prefix in commit message
+
+## Evidence
+
+- Commit examples: 'chore(canvas): remove trailing whitespaces ...', 'chore: strip trailing whitespace ...'
+
+---
+id: tenet-instinct-workflow-canvas-feature
+trigger: "When adding or significantly updating map canvas rendering or interactivity"
+confidence: 0.95
+domain: workflow
+source: repo-analysis
+source_repo: shree1071/TENeT
+---
+
+# Tenet Instinct Workflow Canvas Feature
+
+## Action
+
+Edit or create CanvasLayer.tsx and related hooks, update App.tsx if needed, and optionally add/update tests
+
+## Evidence
+
+- Workflow: canvas-feature-development
+- Pattern in commit sequence and files involved
+
+---
+id: tenet-instinct-workflow-canvas-fix
+trigger: "When fixing a bug or refactoring in map canvas rendering or data pipeline"
+confidence: 0.9
+domain: workflow
+source: repo-analysis
+source_repo: shree1071/TENeT
+---
+
+# Tenet Instinct Workflow Canvas Fix
+
+## Action
+
+Edit CanvasLayer.tsx and corresponding hook, optionally update/add related tests
+
+## Evidence
+
+- Workflow: canvas-refactor-or-bugfix
+- Pattern in commit sequence and files involved
+
+---
+id: tenet-instinct-workflow-canvas-cleanup
+trigger: "When improving test coverage or performing code hygiene for canvas-related code"
+confidence: 0.85
+domain: workflow
+source: repo-analysis
+source_repo: shree1071/TENeT
+---
+
+# Tenet Instinct Workflow Canvas Cleanup
+
+## Action
+
+Edit/add test files, remove dead files, and strip trailing whitespace in relevant files
+
+## Evidence
+
+- Workflow: canvas-test-and-cleanup
+- Pattern in commit sequence and files involved
+
